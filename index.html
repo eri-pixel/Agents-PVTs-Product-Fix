@@ -6,7 +6,7 @@
 <style>
 /* Layout: one centred column; home = flyer-style tile grid, then one card per step */
 :root{--agent:#d9466f;--pvt:#2f6fd0;--bg:#faf7f2;--card:#ffffff;--ink:#22212b;--muted:#6b6875;--line:#e6e0d8;--accent:#d9466f;--accent-ink:#fff;--ok:#2d7a4d;--ok-soft:#e2f2e7;--chg:#9a5b0a;--chg-soft:#fcefd8;--tbc:#8a8794;
---t1:#ef6f5c;--t2:#a2b53a;--t3:#6b8acb;--t4:#e06aa4;--t5:#e9c254;--t6:#b46bd3;--t7:#7f73cf;--t8:#5fc4cc;--t9:#e7a6d6; 
+--t1:#ef6f5c;--t2:#a2b53a;--t3:#6b8acb;--t4:#e06aa4;--t5:#e9c254;--t6:#b46bd3;--t7:#7f73cf;--t8:#5fc4cc;--t9:#e7a6d6;
 --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--body:"Figtree","Segoe UI",system-ui,sans-serif}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17161c;--card:#211f28;--ink:#efedf2;--muted:#a7a3b0;--line:#34313d;--accent:#f27399;--accent-ink:#1b0c12;--ok:#72c995;--ok-soft:#1d3326;--chg:#f0b45e;--chg-soft:#392b16;--tbc:#8f8b99;--agent:#f27399;--pvt:#7aa8f5;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#17161c;--card:#211f28;--ink:#efedf2;--muted:#a7a3b0;--line:#34313d;--accent:#f27399;--accent-ink:#1b0c12;--ok:#72c995;--ok-soft:#1d3326;--chg:#f0b45e;--chg-soft:#392b16;--tbc:#8f8b99;--agent:#f27399;--pvt:#7aa8f5;color-scheme:dark}
@@ -347,9 +347,9 @@ function xs(i){const s=prog(i);return s.xs||(s.xero?[s.xero]:[])}
 function wb(i,c){const L=xs(i);if(c===24)return"$8 per additional child";if(c===0&&L.length!==1)return DATA.progs[i].name;if(c===1&&L.length>1)return L.map(id=>DATA.xero[id][1]).join(", ");const x=L.length?DATA.xero[L[0]]:null;return x?x[c]:""}
 const filled=(i,c)=>{const a=ans(i,c);if(!a)return false;if(c===21)return !!(a.t&&"abcdef".split("").every(k=>a.t[k]));return !!String(a.v||"").trim()};
 const pageDone=(i,k)=>PAGES[k][1].every(c=>filled(i,c));
-function status(i){const s=prog(i);if(s.done)return"Done ✓";if(s.xero!==undefined)return"In progress";return"To do"}
+function status(i){const s=prog(i);if(s.done)return"Done ✓ · tap to change";if(s.xero!==undefined)return"In progress";return"To do"}
 
-async function load(){try{const r=await fetch(SCRIPT_URL+"?t="+Date.now());state=await r.json()||{};}catch(e){toast("Couldn't load saved answers. Check your internet and refresh.")}}
+async function load(){try{const r=await fetch(SCRIPT_URL+"?t="+Date.now());const j=await r.json()||{};if(j.error){toast("Google Sheet error: "+j.error);return}state=j;}catch(e){toast("Couldn't reach the Google Sheet. Check the script's access is set to Anyone.")}}
 async function boot(){
   render();
   if(SCRIPT_URL.startsWith("PASTE")){document.getElementById("app").insertAdjacentHTML("afterbegin",`<div class="fv small" style="margin-bottom:12px">Setup needed: add your Google Apps Script URL at the top of index.html.</div>`);return}
@@ -360,7 +360,7 @@ function rowFor(i){return H.map((h,c)=>{const x=ans(i,c);if(x)return x.v;if(c===
 async function save(i,patch){const id="p"+i;state[id]={...(state[id]||{}),...patch,at:new Date().toISOString()};
   const p=state[id];const com=Object.entries(p.com||{}).filter(([,v])=>v).map(([k,v])=>`${k==="x"?"Step 1":PAGES[k]?.[0]||k}: ${v}`).join("\n");
   const body={id,name:DATA.progs[i].name,data:p,headers:H,row:rowFor(i),status:p.done?"Done":p.xero!==undefined||p.xs?"In progress":"To do",comments:com};
-  try{await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})}catch(e){toast("Didn't save. Check your internet and try again.")}}
+  try{const r=await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(j.ok===false)toast("Didn't save: "+j.error)}catch(e){toast("Didn't save: couldn't reach the Google Sheet. Check the script's access is set to Anyone.")}}
 async function setAns(c,obj){const f={...(prog(cur.i).f||{})};f["c"+c]={was:f["c"+c]?.was??wb(cur.i,c),...obj,by:"Amanda",at:today()};await save(cur.i,{f})}
 
 function render(){const app=document.getElementById("app");
@@ -441,7 +441,7 @@ function field(c){
 }
 function donePage(){const p=DATA.progs[cur.i];const next=DATA.progs.findIndex((q,i)=>!prog(i).done);setTimeout(confetti,60);
   return `${header()}<div class="card" style="text-align:center;display:grid;gap:10px;justify-items:center"><div class="eyebrow">Program done</div><h2>${esc(p.name)} ✓</h2>
-   <p class="muted" style="margin:0">All details filled in. Thank you!</p>
+   <p class="muted" style="margin:0">All details filled in. Thank you! You can come back and change anything later. Just tap this program on the front page.</p>
    <div class="row" style="justify-content:center"><button class="btn" data-a="back">← Back</button>${next>=0?`<button class="btn primary big" data-a="open" data-i="${next}">Next: ${esc(DATA.progs[next].name)} ▶</button>`:`<button class="btn primary big" data-a="excel">Download Excel</button>`}<button class="btn" data-a="home">All programs</button></div></div>`}
 
 let busy=false;
