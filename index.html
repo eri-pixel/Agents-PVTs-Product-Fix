@@ -12,7 +12,7 @@
 :root[data-theme="dark"]{--bg:#17161c;--card:#211f28;--ink:#efedf2;--muted:#a7a3b0;--line:#34313d;--accent:#f27399;--accent-ink:#1b0c12;--ok:#72c995;--ok-soft:#1d3326;--chg:#f0b45e;--chg-soft:#392b16;--tbc:#8f8b99;--agent:#f27399;--pvt:#7aa8f5;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
-.wrap{max-width:760px;margin:0 auto;padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:880px;margin:0 auto;padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1,h2{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.1}
 h1{font-size:clamp(1.8rem,6vw,2.6rem);font-weight:800}
 h2{font-size:clamp(1.3rem,4.5vw,1.7rem);font-weight:800}
@@ -54,7 +54,29 @@ textarea{min-height:90px}
 .fv.tbc{color:var(--tbc);font-style:italic}
 .tag{font:700 .72rem var(--body);padding:2px 8px;border-radius:999px}
 .tag.ok{background:var(--ok-soft);color:var(--ok)}.tag.chg{background:var(--chg-soft);color:var(--chg)}
-.foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px;border-top:1px solid var(--line);padding-top:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));position:sticky;bottom:0;background:var(--card);z-index:2}
+.saving{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:600 .8rem var(--body);color:var(--muted);z-index:9}
+.btn.tog{display:flex;gap:10px;align-items:center;width:100%;text-align:left;margin:12px 0}
+.btn.tog .box{width:22px;height:22px;flex:none;border:2px solid var(--muted);border-radius:6px;display:grid;place-items:center;font-weight:800;color:var(--card)}
+.btn.tog.on{border-color:var(--accent)}.btn.tog.on .box{background:var(--accent);border-color:var(--accent)}
+.btn.danger{color:#b4232c;border-color:transparent;background:none}
+.btn.dangerfill{background:#b4232c;border-color:#b4232c;color:#fff}
+.confirm{border:2px solid #b4232c;border-radius:14px;padding:14px;margin-bottom:14px;display:grid;gap:8px;background:var(--card)}
+input,textarea{font-size:16px}
+.btn{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+@media (min-width:900px){.card{padding:28px 32px}.tiles{gap:14px}.tile{min-height:130px;font-size:1.15rem}}
+@media (max-width:600px){
+ .wrap{padding-block:14px 30px}
+ .card{padding:16px 14px;border-radius:16px}
+ h2{font-size:1.25rem}
+ .top .chip{order:3;width:100%;text-align:center}
+ .choices .btn{flex:1 1 calc(50% - 8px);text-align:center}
+ .btn.big{width:100%}
+ .foot .btn{flex:1}
+ .foot .small{width:100%;text-align:center;order:-1}
+ .pick .btn{padding:12px 13px}
+ .tile{min-height:96px;font-size:.98rem}
+}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:9}
 #confetti{position:fixed;inset:0;pointer-events:none}
 .choices{display:flex;flex-wrap:wrap;gap:8px}
@@ -65,7 +87,7 @@ textarea{min-height:90px}
 </style>
 </head><body>
 <div class="wrap" id="app"><div class="hero"><h1>Let's Fix Agents and PVTs</h1><p class="muted">Loading…</p></div></div>
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" hidden></div><div class="saving" id="saving" hidden></div>
 <script>
 // ===== SETUP: paste your Google Apps Script web app URL between the quotes =====
 const SCRIPT_URL="https://script.google.com/macros/s/AKfycbx6dKy3Hsdk_6w5v9rijK2h7eb8dLRG84amvVv7CYyXY9-anrp0cbU7CZJZIF_9fXhn2g/exec";
@@ -354,13 +376,21 @@ async function boot(){
   render();
   if(SCRIPT_URL.startsWith("PASTE")){document.getElementById("app").insertAdjacentHTML("afterbegin",`<div class="fv small" style="margin-bottom:12px">Setup needed: add your Google Apps Script URL at the top of index.html.</div>`);return}
   await load();render();
-  setInterval(async()=>{if(!cur){await load();render()}},30000);
+  setInterval(async()=>{if(!cur&&!flushing&&!Object.keys(pending).length){await load();if(!cur)render()}},30000);
 }
 function rowFor(i){return H.map((h,c)=>{const x=ans(i,c);if(x)return x.v;if(c===22)return ans(i,21)?.agent||"TBC";if(c>=34&&c<=40)return"TBC (Erika)";const w=wb(i,c);return isTbc(w)?"TBC":w})}
-async function save(i,patch){const id="p"+i;state[id]={...(state[id]||{}),...patch,at:new Date().toISOString()};
-  const p=state[id];const com=Object.entries(p.com||{}).filter(([,v])=>v).map(([k,v])=>`${k==="x"?"Step 1":PAGES[k]?.[0]||k}: ${v}`).join("\n");
-  const body={id,name:DATA.progs[i].name,data:p,headers:H,row:rowFor(i),status:p.done?"Done":p.xero!==undefined||p.xs?"In progress":"To do",comments:com};
-  try{const r=await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)});const j=await r.json().catch(()=>({}));if(j.ok===false)toast("Didn't save: "+j.error)}catch(e){toast("Didn't save: couldn't reach the Google Sheet. Check the script's access is set to Anyone.")}}
+// Saves happen in the background so taps feel instant
+let pending={},flushing=false;
+function bodyFor(i){const id="p"+i;const p=state[id]||{};const com=Object.entries(p.com||{}).filter(([,v])=>v).map(([k,v])=>`${k==="x"?"Step 1":PAGES[k]?.[0]||k}: ${v}`).join("\n");
+  return {id,name:DATA.progs[i].name,data:p,headers:H,row:rowFor(i),status:p.done?"Done":(p.xero!==undefined||p.xs)?"In progress":"To do",comments:com}}
+function saveNote(t){const el=document.getElementById("saving");if(!el)return;el.textContent=t;el.hidden=!t;clearTimeout(saveNote.t);if(t==="Saved ✓")saveNote.t=setTimeout(()=>el.hidden=true,1500)}
+async function flush(){if(flushing)return;flushing=true;saveNote("Saving…");let failed=false;
+  while(Object.keys(pending).length){const i=+Object.keys(pending)[0];delete pending[i];
+    try{const r=await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(bodyFor(i))});const j=await r.json().catch(()=>({}));if(j.ok===false){failed=true;toast("Didn't save: "+j.error)}}
+    catch(e){failed=true;pending[i]=true;break}}
+  flushing=false;
+  if(failed&&Object.keys(pending).length){saveNote("Not saved yet, retrying…");setTimeout(flush,4000)}else saveNote(failed?"":"Saved ✓")}
+function save(i,patch,replace){const id="p"+i;state[id]=replace?{...patch}:{...(state[id]||{}),...patch,at:new Date().toISOString()};pending[i]=true;flush();return Promise.resolve()}
 async function setAns(c,obj){const f={...(prog(cur.i).f||{})};f["c"+c]={was:f["c"+c]?.was??wb(cur.i,c),...obj,by:"Amanda",at:today()};await save(cur.i,{f})}
 
 function render(){const app=document.getElementById("app");
@@ -377,13 +407,14 @@ function home(){
    ${done&&next>=0?`<div class="row" style="justify-content:center;margin-top:18px"><button class="btn small" data-a="excel">Download Excel of answers so far</button></div>`:""}`;
 }
 function header(){const p=DATA.progs[cur.i];const at=cur.step==="xero"?0:cur.step==="done"?PAGES.length+1:cur.step+1;
-  return `<div class="top"><button class="btn small" data-a="home">← All programs</button><span class="chip">${cur.i+1} of 9 · ${esc(p.name)}</span></div>
+  return `<div class="top"><button class="btn small" data-a="home">← All programs</button><span class="chip">${cur.i+1} of 9 · ${esc(p.name)}</span><button class="btn small danger" data-a="resetask">↺ Reset</button></div>
+  ${confirmReset?`<div class="confirm"><b>Are you sure?</b><div class="small">This clears every answer and comment for <b>${esc(p.name)}</b> and starts it again from Step 1. This can't be undone.</div><div class="row"><button class="btn small dangerfill" data-a="resetyes">Yes, reset ${esc(p.name)}</button><button class="btn small" data-a="resetno">No, keep my answers</button></div></div>`:""}
   <div class="steps">${Array.from({length:PAGES.length+1},(_,k)=>`<span class="${k<=at?"on":""}"></span>`).join("")}</div>`}
-let multi=false,pickSet=[];
+let multi=false,pickSet=[],confirmReset=false;
 function xeroPage(){const p=DATA.progs[cur.i],s=prog(cur.i);const L=multi?pickSet:xs(cur.i);
   return `${header()}<div class="card"><div class="eyebrow">Step 1</div><h2>Which Xero product${multi?"s are":" is"} ${esc(p.name)}?</h2>
    <p class="muted small">We'll use the details to start you off.</p>
-   <label class="row small" style="margin:10px 0;cursor:pointer;font-weight:600"><input type="checkbox" id="multi" style="width:auto" ${multi?"checked":""}> This program uses more than one Xero product</label>
+   <button class="btn tog ${multi?"on":""}" data-a="multitog" aria-pressed="${multi}"><span class="box">${multi?"✓":""}</span> This program uses more than one Xero product</button>
    <div class="pick">${p.cands.map(id=>{const x=DATA.xero[id];const on=L.includes(id);return `<button class="btn ${on?"sel":""}" data-a="xero" data-v="${id}"><span>${multi?(on?"☑ ":"☐ "):""}<b>${esc(x[0])}</b><br><span class="small muted">${esc(x[1])}</span></span></button>`}).join("")}
    ${multi?"":`<button class="btn ${s.xero===null&&!s.xs?.length?"sel":""}" data-a="xero" data-v=""><span><b>None of these</b><br><span class="small muted">Start with empty details</span></span></button>`}</div>
    ${multi?`<div class="foot"><span class="small muted" style="align-self:center">${pickSet.length} selected</span><button class="btn primary" data-a="xmulti" ${pickSet.length?"":"disabled"}>Next →</button></div>`:""}
@@ -450,8 +481,12 @@ document.addEventListener("click",async e=>{
   try{await act(a,t,c)}finally{busy=false}
 });
 async function act(a,t,c){
+  if(a==="multitog"){multi=!multi;pickSet=multi?xs(cur.i).slice():[];render();return}
+  if(a==="resetask"){confirmReset=true;render();window.scrollTo(0,0);return}
+  if(a==="resetno"){confirmReset=false;render();return}
+  if(a==="resetyes"){confirmReset=false;editing=null;multi=false;pickSet=[];await save(cur.i,{},true);cur.step="xero";render();window.scrollTo(0,0);toast(DATA.progs[cur.i].name+" has been reset");return}
   const keep=window.scrollY;const done=()=>{render();window.scrollTo(0,keep)};const top=()=>{render();window.scrollTo(0,0)};
-  if(a==="home"){cur=null;editing=null;return top()}
+  if(a==="home"){cur=null;editing=null;confirmReset=false;return top()}
   if(a==="open"){const i=+t.dataset.i;cur={i,step:prog(i).xero===undefined?"xero":0};editing=null;pickSet=xs(i).slice();multi=pickSet.length>1;return top()}
   if(a==="xero"){const v=t.dataset.v||null;if(multi){pickSet=pickSet.includes(v)?pickSet.filter(x=>x!==v):[...pickSet,v];return done()}
     const same=xs(cur.i).length===(v?1:0)&&(v?xs(cur.i)[0]===v:prog(cur.i).xero===null);if(!same)await save(cur.i,{xero:v,xs:v?[v]:[],f:{}});cur.step=0;return top()}
